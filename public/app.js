@@ -44,6 +44,7 @@ function initDualRangeSlider(minId, maxId, fillId, labelId, defaultStart, defaul
     fillEl.style.left = `${pctLo}%`;
     fillEl.style.width = `${pctHi - pctLo}%`;
     labelEl.textContent = `${sliderValueToTime(lo)} – ${sliderValueToTime(hi)}`;
+    saveSettings();
   }
 
   minEl.addEventListener('input', update);
@@ -66,13 +67,17 @@ const PRESET_STAYS = [2,3,4,5,6,7,8,9,10,11,12,13,14];
 const DEFAULT_STAYS = new Set([5, 6, 7]);
 const customStays = new Set();
 
-function initStayChips() {
+function initStayChips(initialActive = null) {
   const container = document.getElementById('stayChips');
-  const activeNow = new Set(
-    [...(container?.querySelectorAll('.chip.active[data-stay]') || [])]
-      .map(c => parseInt(c.dataset.stay))
-  );
-  if (activeNow.size === 0) DEFAULT_STAYS.forEach(n => activeNow.add(n));
+  const existing = container?.querySelectorAll('.chip.active[data-stay]');
+  let activeNow;
+  if (existing && existing.length > 0) {
+    activeNow = new Set([...existing].map(c => parseInt(c.dataset.stay)));
+  } else if (initialActive) {
+    activeNow = new Set(initialActive);
+  } else {
+    activeNow = new Set(DEFAULT_STAYS);
+  }
   container.innerHTML = '';
   for (const n of PRESET_STAYS) container.appendChild(createStayChip(n, false, activeNow));
   for (const n of [...customStays].sort((a, b) => a - b)) container.appendChild(createStayChip(n, true, activeNow));
@@ -90,6 +95,7 @@ function createStayChip(n, isCustom = false, activeSet = DEFAULT_STAYS) {
     if (getSelectedStays().length === 1 && chip.classList.contains('active')) return;
     chip.classList.toggle('active');
     updateQueryCount();
+    saveSettings();
   });
   return chip;
 }
@@ -147,6 +153,27 @@ function updateQueryCount() {
   const daysInMonth = new Date(year, month, 0).getDate();
   const el = document.getElementById('queryCount');
   if (el) el.textContent = `共 ${daysInMonth}×${stays.length} = ${daysInMonth * stays.length} 筆查詢`;
+}
+
+function saveSettings() {
+  try {
+    const settings = {
+      year:  parseInt(document.getElementById('inputYear')?.value)  || 2026,
+      month: parseInt(document.getElementById('inputMonth')?.value) || 9,
+      stays: getSelectedStays(),
+      customStays: [...customStays],
+      outboundTimeRange: getTimeRange('outboundMin', 'outboundMax'),
+      returnTimeRange:   getTimeRange('returnMin',   'returnMax'),
+    };
+    localStorage.setItem('flightSearchSettings', JSON.stringify(settings));
+  } catch {}
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem('flightSearchSettings');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
 }
 
 // ============================================
@@ -624,15 +651,30 @@ function exportCSV() {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  initDualRangeSlider('outboundMin', 'outboundMax', 'outboundFill', 'outboundTimeLabel', '06:00', '23:00');
-  initDualRangeSlider('returnMin',   'returnMax',   'returnFill',   'returnTimeLabel',   '06:00', '23:00');
-  initStayChips();
+  const saved = loadSettings();
+
+  if (saved) {
+    const yearEl  = document.getElementById('inputYear');
+    const monthEl = document.getElementById('inputMonth');
+    if (yearEl)  yearEl.value  = saved.year;
+    if (monthEl) monthEl.value = saved.month;
+    if (saved.customStays) saved.customStays.forEach(n => customStays.add(n));
+  }
+
+  const ob = saved?.outboundTimeRange;
+  const rt = saved?.returnTimeRange;
+  initDualRangeSlider('outboundMin', 'outboundMax', 'outboundFill', 'outboundTimeLabel',
+    ob?.start || '06:00', ob?.end || '23:00');
+  initDualRangeSlider('returnMin', 'returnMax', 'returnFill', 'returnTimeLabel',
+    rt?.start || '06:00', rt?.end || '23:00');
+
+  initStayChips(saved?.stays || null);
   loadData();
   updateSubtitle();
 
   ['inputOrigin', 'inputDest', 'inputYear', 'inputMonth'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('input', () => { updateSubtitle(); updateQueryCount(); });
+    if (el) el.addEventListener('input', () => { updateSubtitle(); updateQueryCount(); saveSettings(); });
   });
 
   ['inputYear', 'inputMonth'].forEach(id => {
