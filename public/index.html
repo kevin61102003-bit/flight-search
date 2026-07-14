@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>✈️ 台北→釜山 機票價格查詢</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1>✈️ 台北 → 釜山 機票價格追蹤</h1>
+      <p class="subtitle" id="subtitle">2026 年 9 月 · 來回 · 停留 5–7 天</p>
+    </div>
+    <div class="header-actions">
+      <div class="search-settings">
+        <!-- Row 1: Route + Year/Month -->
+        <div class="settings-row">
+          <div class="settings-field">
+            <label>出發地</label>
+            <input type="text" id="inputOrigin" value="臺北" placeholder="出發城市">
+          </div>
+          <span class="arrow">→</span>
+          <div class="settings-field">
+            <label>目的地</label>
+            <input type="text" id="inputDest" value="釜山" placeholder="目的地城市">
+          </div>
+          <div class="settings-field">
+            <label>年份</label>
+            <input type="number" id="inputYear" value="2026" min="2026" style="width:70px">
+          </div>
+          <div class="settings-field">
+            <label>月份</label>
+            <select id="inputMonth" class="settings-select">
+              <option value="1">1月</option><option value="2">2月</option>
+              <option value="3">3月</option><option value="4">4月</option>
+              <option value="5">5月</option><option value="6">6月</option>
+              <option value="7">7月</option><option value="8">8月</option>
+              <option value="9" selected>9月</option><option value="10">10月</option>
+              <option value="11">11月</option><option value="12">12月</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Row 2: Stay duration chips -->
+        <div class="settings-row settings-row--chips">
+          <label class="settings-label-block">停留天數</label>
+          <div id="stayChips" class="stay-chips"></div>
+          <span id="queryCount" class="query-count"></span>
+        </div>
+
+        <!-- Row 3: Time range sliders -->
+        <div class="settings-row settings-row--sliders">
+          <div class="time-range-field">
+            <label>去程時間 <span id="outboundTimeLabel" class="time-label">06:00 – 23:00</span></label>
+            <div class="range-slider-wrap">
+              <input type="range" id="outboundMin" min="0" max="48" value="12" step="1">
+              <input type="range" id="outboundMax" min="0" max="48" value="46" step="1">
+              <div class="range-track"><div class="range-fill" id="outboundFill"></div></div>
+            </div>
+            <div class="range-endpoints"><span>00:00</span><span>24:00</span></div>
+          </div>
+          <div class="time-range-field">
+            <label>回程時間 <span id="returnTimeLabel" class="time-label">06:00 – 23:00</span></label>
+            <div class="range-slider-wrap">
+              <input type="range" id="returnMin" min="0" max="48" value="12" step="1">
+              <input type="range" id="returnMax" min="0" max="48" value="46" step="1">
+              <div class="range-track"><div class="range-fill" id="returnFill"></div></div>
+            </div>
+            <div class="range-endpoints"><span>00:00</span><span>24:00</span></div>
+          </div>
+        </div>
+
+        <!-- Row 4: Last updated -->
+        <div class="settings-row settings-row--meta">
+          <span id="lastUpdated" class="last-updated">最後更新：讀取中…</span>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="btnSearch" class="btn-primary" onclick="startSearch()">
+          🔍 開始查詢全部
+        </button>
+        <button id="btnClearRescrape" class="btn-secondary" onclick="clearAndRescrape()">
+          🗑️ 清除快取重跑
+        </button>
+        <button class="btn-secondary" onclick="refreshData()">
+          🔄 重新整理
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Summary Cards -->
+    <section class="summary-cards">
+      <div class="card" id="cardCheapest">
+        <div class="card-label">最便宜價格</div>
+        <div class="card-value" id="cheapestPrice">—</div>
+        <div class="card-detail" id="cheapestDetail"></div>
+      </div>
+      <div class="card" id="cardAvg">
+        <div class="card-label">平均價格</div>
+        <div class="card-value" id="avgPrice">—</div>
+      </div>
+      <div class="card" id="cardCount">
+        <div class="card-label">已查詢</div>
+        <div class="card-value" id="searchCount">0</div>
+        <div class="card-detail" id="searchDetail">筆資料</div>
+      </div>
+      <div class="card" id="cardRange">
+        <div class="card-label">價格範圍</div>
+        <div class="card-value" id="priceRange">—</div>
+      </div>
+    </section>
+
+    <!-- Search Progress -->
+    <section id="progressSection" class="hidden">
+      <div class="progress-container">
+        <div class="progress-header">
+          <span id="progressLabel">查詢中...</span>
+          <span id="progressCount">0 / 90</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div id="progressLog" class="progress-log"></div>
+      </div>
+    </section>
+
+    <!-- Chart -->
+    <section class="chart-section">
+      <div class="section-header">
+        <h2>📊 價格走勢圖</h2>
+        <div class="chart-controls">
+          <label>停留天數：
+            <select id="filterStay" onchange="updateChart()">
+              <option value="all">全部</option>
+              <option value="5">5 天</option>
+              <option value="6">6 天</option>
+              <option value="7">7 天</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="priceChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Price Table -->
+    <section class="table-section">
+      <div class="section-header">
+        <h2>📋 每日價格明細</h2>
+        <div class="table-controls">
+          <input type="text" id="filterDate" placeholder="🔍 搜尋日期 (eg: 09-15)" oninput="renderTable()">
+          <button class="btn-small" onclick="exportCSV()">📥 匯出 CSV</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table id="priceTable">
+          <thead>
+            <tr>
+              <th>出發日期</th>
+              <th>回程日期</th>
+              <th>停留天數</th>
+              <th>價格 (NTD)</th>
+              <th>狀態</th>
+              <th>來源</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="6" class="empty-state">尚未查詢資料，點擊「開始查詢」按鈕</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>資料來源：Google Flights · Puppeteer 自動化爬取</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
