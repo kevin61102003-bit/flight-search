@@ -39,7 +39,13 @@ assert.ok(Object.values(oct).flat().some(f => f.price === 6000), 'Oct entries su
 
 // Test 5: clear() removes all
 const count = cache.clear();
-assert.ok(count >= 1, 'clear() should return count of removed entries');
+assert.strictEqual(count, 1, 'clear() should return exactly 1 entry from Oct');
+
+// Test 6: corrupt JSON returns null
+const corruptDir = path.join(process.env.CACHE_DIR_OVERRIDE, '2026-11');
+fs.mkdirSync(corruptDir, { recursive: true });
+fs.writeFileSync(path.join(corruptDir, 'corrupt_key.json'), '{not valid json}', 'utf8');
+assert.strictEqual(cache.get('corrupt_key', 2026, 11), null, 'corrupt JSON should return null');
 
 cleanup();
 console.log('✅ All cache tests passed!');

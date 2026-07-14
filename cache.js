@@ -10,10 +10,11 @@ function monthDir(year, month) {
 }
 
 function get(key, year, month) {
-  const filePath = path.join(monthDir(year, month), `${sanitize(key)}.json`);
-  if (!fs.existsSync(filePath)) return null;
+  const dir = path.join(BASE_CACHE_DIR, `${year}-${String(month).padStart(2, '0')}`);
+  const file = path.join(dir, sanitize(key) + '.json');
+  if (!fs.existsSync(file)) return null;
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8')).data;
+    return JSON.parse(fs.readFileSync(file, 'utf8')).data;
   } catch {
     return null;
   }
@@ -54,7 +55,7 @@ function getLastUpdated(year, month) {
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
   if (files.length === 0) return null;
   const mtimes = files.map(f => fs.statSync(path.join(dir, f)).mtimeMs);
-  return new Date(Math.max(...mtimes)).toISOString();
+  return new Date(mtimes.reduce((a, b) => (a > b ? a : b))).toISOString();
 }
 
 function clearMonth(year, month) {
