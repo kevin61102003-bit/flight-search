@@ -106,13 +106,28 @@ CLI 爬蟲：`node server.js --scrape-all --year=2026 --month=9 --stays=5,6,7`
 2. `server.js` — `/api/search` handler 讀新欄位，傳給 `scrapeAll`
 3. `index.html` — 在 `.search-settings` 加新的 settings-row
 4. `style.css` — 視需要補樣式
-5. `app.js` — `getSearchParams()` 加新欄位，`DOMContentLoaded` 補初始化
+5. `app.js` — `getSearchParams()` 加新欄位，`saveSettings()` 會自動包含，`DOMContentLoaded` 補初始化與還原邏輯
 
 **新增顯示欄位（例如顯示航班時刻）：**
 1. `scraper.js` — `result` 物件加欄位
 2. `cache.js` — 不需改（存什麼就還什麼）
 3. `server.js` — 通常不需改
 4. `app.js` — `renderTable()` 或 `updateChart()` 加欄位
+
+## 前端設定持久化
+
+`app.js` 用 `localStorage` 記住使用者的設定，key 為 `flightSearchSettings`：
+
+```js
+// 存的內容
+{ year, month, stays: [3,8,10], customStays: [21], outboundTimeRange, returnTimeRange }
+
+// 相關函式
+saveSettings()   // 任何設定改變時呼叫（chip 切換、滑桿移動、年月變更）
+loadSettings()   // DOMContentLoaded 時呼叫，回傳物件或 null
+```
+
+新增可持久化的設定欄位時：在 `saveSettings()` 加欄位，在 `DOMContentLoaded` 的還原區塊加對應讀回邏輯。
 
 ## 注意事項
 
