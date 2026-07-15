@@ -17,26 +17,31 @@
       <div class="search-settings">
         <!-- Row 1: Route + Year/Month -->
         <div class="settings-row">
-          <div class="settings-field" id="routeSwitcherField">
+          <div class="settings-field" id="routeSwitcherField"
+            data-tip="快速切換到已經抓過的航線；選了會自動填入出發地／目的地並載入該航線的資料">
             <label>已存航線</label>
             <select id="routeSwitcher" class="settings-select">
               <option value="">—</option>
             </select>
           </div>
-          <div class="settings-field">
+          <div class="settings-field"
+            data-tip="出發城市，例如 臺北。改這裡等於換一條航線，查詢後會存成新的航線資料">
             <label>出發地</label>
             <input type="text" id="inputOrigin" value="臺北" placeholder="出發城市">
           </div>
           <span class="arrow">→</span>
-          <div class="settings-field">
+          <div class="settings-field"
+            data-tip="目的地城市，例如 首爾、釜山、東京。改這裡等於換一條航線，兩條航線的資料各自分開保存">
             <label>目的地</label>
             <input type="text" id="inputDest" value="釜山" placeholder="目的地城市">
           </div>
-          <div class="settings-field">
+          <div class="settings-field"
+            data-tip="要查詢的年份">
             <label>年份</label>
             <input type="number" id="inputYear" value="2026" min="2026" style="width:70px">
           </div>
-          <div class="settings-field">
+          <div class="settings-field"
+            data-tip="要查詢的月份；查詢會涵蓋這個月的每一天當作出發日">
             <label>月份</label>
             <select id="inputMonth" class="settings-select">
               <option value="1">1月</option><option value="2">2月</option>
@@ -84,17 +89,17 @@
         </div>
       </div>
       <div class="btn-row">
-        <button id="btnSearch" class="btn-primary" onclick="startSearch()">
-          🔍 開始查詢全部
+        <button id="btnSearch" class="btn-primary" onclick="startSearch()"
+          data-tip="只補「還沒抓到、或沒有價格」的日期，已經有價格的會跳過（增量查詢，不會清除舊資料）">
+          🔍 開始查詢
         </button>
-        <button id="btnClearRescrape" class="btn-secondary" onclick="clearAndRescrape()">
-          🗑️ 清除快取重跑
+        <button id="btnClearCache" class="btn-secondary" onclick="clearCache()"
+          data-tip="清除「目前航線 + 這個月」的快取（清除前會先確認）。清完不會自動查詢，要重抓請再按「開始查詢」">
+          🗑️ 清除快取
         </button>
-        <button id="btnPublish" class="btn-secondary" onclick="publishToSite()">
+        <button id="btnPublish" class="btn-secondary" onclick="publishToSite()"
+          data-tip="把最新資料加密後上傳，更新公開網站；親友約 1 分鐘後就能看到新價格">
           📤 發布到網站
-        </button>
-        <button class="btn-secondary" onclick="refreshData()">
-          🔄 重新整理
         </button>
       </div>
     </div>

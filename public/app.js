@@ -229,41 +229,41 @@ function updateLastUpdated(iso, year, month) {
   el.textContent = `最後更新：${str}（${year}年${month}月）`;
 }
 
-async function refreshData() {
-  document.getElementById('btnSearch').textContent = '🔄 重新整理中...';
-  document.getElementById('btnSearch').disabled = true;
-  await loadData();
-  document.getElementById('btnSearch').textContent = '🔍 開始查詢全部';
-  document.getElementById('btnSearch').disabled = false;
-}
-
-async function clearAndRescrape() {
+// Clear ONLY the current route + month. Does not scrape — press 開始查詢 after
+// if you want fresh prices. Prompts for confirmation to avoid accidental wipes.
+async function clearCache() {
   const params = getSearchParams();
-  const btn = document.getElementById('btnClearRescrape');
+  const label = `${params.originQuery}→${params.destinationQuery} ${params.year}年${params.month}月`;
+  if (!confirm(`確定要清除「${label}」的快取嗎？\n（只清這條航線的這個月，其他航線與月份不受影響）`)) return;
+
+  const btn = document.getElementById('btnClearCache');
   btn.textContent = '🗑️ 清除中...';
   btn.disabled = true;
 
   document.getElementById('progressSection').classList.remove('hidden');
   document.getElementById('progressLog').innerHTML = '';
-  addLog('ok', '⏳ 清除中…');
 
   try {
     await fetch('/api/clear-cache', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ year: params.year, month: params.month }),
+      body: JSON.stringify({
+        year: params.year, month: params.month,
+        origin: params.originQuery, dest: params.destinationQuery,
+      }),
     });
-    addLog('ok', `🗑️ 已清除 ${params.year}年${params.month}月快取`);
+    addLog('ok', `🗑️ 已清除 ${label} 快取`);
   } catch (err) {
     addLog('error', `❌ 清除快取失敗: ${err.message}`);
-    btn.textContent = '🗑️ 清除快取重跑';
+    btn.textContent = '🗑️ 清除快取';
     btn.disabled = false;
     return;
   }
 
-  btn.textContent = '🗑️ 清除快取重跑';
+  btn.textContent = '🗑️ 清除快取';
   btn.disabled = false;
-  await startSearch();
+  await loadData();     // reflect the now-empty month in the view
+  populateRoutes();     // route may drop from the switcher if it has no months left
 }
 
 async function publishToSite() {
@@ -451,7 +451,7 @@ async function startSearch() {
     addLog('error', `❌ 查詢失敗: ${err.message}`);
   }
 
-  btn.textContent = '🔍 開始查詢全部';
+  btn.textContent = '🔍 開始查詢';
   btn.disabled = false;
 }
 

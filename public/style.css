@@ -107,6 +107,81 @@ header {
   justify-content: flex-end;
 }
 
+/* Hover tooltips: explain each button on mouse-over (data-tip attribute) */
+.btn-row button[data-tip] { position: relative; }
+.btn-row button[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 240px;
+  background: #1e293b;
+  color: #fff;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  z-index: 200;
+}
+/* little arrow under the tooltip */
+.btn-row button[data-tip]::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #1e293b;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  z-index: 200;
+}
+.btn-row button[data-tip]:hover::after,
+.btn-row button[data-tip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Settings-field tooltips: appear BELOW the field (they sit near the top edge) */
+.settings-field[data-tip] { position: relative; }
+.settings-field[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: max-content;
+  max-width: 240px;
+  background: #1e293b;
+  color: #fff;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  z-index: 200;
+}
+.settings-field[data-tip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* Buttons */
 .btn-primary, .btn-secondary, .btn-small {
   padding: 10px 20px;
