@@ -1,7 +1,11 @@
 const express = require('express');
 const path = require('path');
+const util = require('util');
+const { exec } = require('child_process');
 const cache = require('./cache');
 const { scrapeAll, generateDates } = require('./scraper');
+
+const execP = util.promisify(exec);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -111,6 +115,37 @@ app.post('/api/clear-cache', (req, res) => {
   } else {
     const count = cache.clear();
     res.json({ message: `Cleared ${count} cache entries`, count });
+  }
+});
+
+/**
+ * POST /api/publish
+ * Encrypt cache → docs/ (build-static.js) then commit & push to GitHub Pages.
+ * Relies on git credentials already cached (first push done interactively once).
+ */
+app.post('/api/publish', async (req, res) => {
+  const steps = [];
+  try {
+    const build = await execP(`"${process.execPath}" build-static.js`, { cwd: __dirname });
+    steps.push('🔒 已加密產生 docs/');
+    if (build.stdout) console.log(build.stdout);
+
+    await execP('git add -A', { cwd: __dirname });
+    try {
+      await execP('git commit -m "data: update flight prices"', { cwd: __dirname });
+      steps.push('📝 已提交變更');
+    } catch {
+      steps.push('（無新變更，沿用現有 commit）');
+    }
+
+    const push = await execP('git push', { cwd: __dirname });
+    steps.push('🚀 已推送到 GitHub Pages（約 1 分鐘後更新）');
+    if (push.stdout) console.log(push.stdout);
+
+    res.json({ ok: true, steps });
+  } catch (err) {
+    console.error('publish 失敗:', err.message);
+    res.json({ ok: false, steps, error: err.message, stderr: (err.stderr || '').slice(0, 500) });
   }
 });
 

@@ -260,6 +260,35 @@ async function clearAndRescrape() {
   await startSearch();
 }
 
+async function publishToSite() {
+  const btn = document.getElementById('btnPublish');
+  const orig = btn.textContent;
+  btn.textContent = '📤 發布中...';
+  btn.disabled = true;
+
+  document.getElementById('progressSection').classList.remove('hidden');
+  document.getElementById('progressLog').innerHTML = '';
+  addLog('ok', '📤 開始發布到網站（加密 → 上傳 GitHub）…');
+
+  try {
+    const res = await fetch('/api/publish', { method: 'POST' });
+    const data = await res.json();
+    (data.steps || []).forEach(s => addLog('ok', '  ' + s));
+    if (data.ok) {
+      addLog('ok', '✅ 發布完成！GitHub Pages 約 1 分鐘後更新，親友重新整理即可看到新價格。');
+    } else {
+      addLog('error', `❌ 發布失敗: ${data.error || '未知錯誤'}`);
+      if (data.stderr) addLog('error', data.stderr);
+      addLog('error', '若是登入問題，請在 PowerShell 手動跑一次 git push 重新登入。');
+    }
+  } catch (err) {
+    addLog('error', `❌ 發布失敗: ${err.message}`);
+  }
+
+  btn.textContent = orig;
+  btn.disabled = false;
+}
+
 // ============================================
 // Summary Cards
 // ============================================
