@@ -27,9 +27,9 @@ async function scrapeSingle(date, returnDate, browser, opts = {}) {
   const retMinHour = parseInt(returnTimeRange.start.split(':')[0]);
   const retMaxHour = parseInt(returnTimeRange.end.split(':')[0]);
 
-  const routeKey = `${origin}_${destination}`;
-  const cacheKey = `${routeKey}_${date}_${returnDate}`;
-  const cached = cache.get(cacheKey, year, month);
+  const slug = cache.routeSlug(origin, destination);
+  const cacheKey = `${date}_${returnDate}`; // route is encoded in the folder, not the filename
+  const cached = cache.get(cacheKey, slug, year, month);
   if (cached && cached.price) {
     console.log(`  [CACHE]  ${date} → ${returnDate}: NT$${cached.price}`);
     return cached;
@@ -278,7 +278,7 @@ async function scrapeSingle(date, returnDate, browser, opts = {}) {
     }
 
     const result = { date, returnDate, price: price || null, currency: 'TWD', route: `${origin} → ${destination}`, url: page.url() };
-    cache.set(cacheKey, result, year, month);
+    cache.set(cacheKey, result, slug, year, month);
     return result;
 
   } catch (err) {
@@ -287,7 +287,7 @@ async function scrapeSingle(date, returnDate, browser, opts = {}) {
       try { await page.screenshot({ path: path.join(DEBUG_DIR, `error_${date}_${returnDate}.png`) }); } catch (_) {}
     }
     const result = { date, returnDate, price: null, currency: 'TWD', route: `${origin} → ${destination}`, error: err.message, url: '' };
-    cache.set(cacheKey, result, year, month);
+    cache.set(cacheKey, result, slug, year, month);
     return result;
   } finally {
     if (page) await page.close();

@@ -5,6 +5,10 @@
 let allData = {};
 let chartInstance = null;
 
+// Static-mode (GitHub Pages) route state
+let staticManifest = null;
+let staticSlug = null;
+
 // 'dynamic' = served by local Express; 'static' = GitHub Pages (read-only, encrypted)
 const APP_MODE = (typeof window !== 'undefined' && window.APP_MODE) || 'dynamic';
 const IS_STATIC = APP_MODE === 'static';
@@ -165,9 +169,11 @@ function updateQueryCount() {
 
 function saveSettings() {
   try {
+    const p = getSearchParams();
     const settings = {
-      year:  parseInt(document.getElementById('inputYear')?.value)  || 2026,
-      month: parseInt(document.getElementById('inputMonth')?.value) || 9,
+      year:  p.year,
+      month: p.month,
+      slug:  IS_STATIC ? staticSlug : undefined,
       stays: getSelectedStays(),
       customStays: [...customStays],
       outboundTimeRange: getTimeRange('outboundMin', 'outboundMax'),
@@ -192,7 +198,7 @@ async function loadData() {
   if (IS_STATIC) return loadDataStatic();
   try {
     const params = getSearchParams();
-    const qs = `year=${params.year}&month=${params.month}`;
+    const qs = dataQuery(params);
     const [statsRes, resultsRes] = await Promise.all([
       fetch(`/api/stats?${qs}`),
       fetch(`/api/results?${qs}`),
@@ -343,8 +349,15 @@ function computeAverages() {
 // ============================================
 
 function getSearchParams() {
-  const year  = parseInt(document.getElementById('inputYear')?.value)  || 2026;
-  const month = parseInt(document.getElementById('inputMonth')?.value) || 9;
+  const monthRaw = document.getElementById('inputMonth')?.value || '';
+  let year, month;
+  if (String(monthRaw).includes('-')) {
+    // static mode: month <select> holds "year-month" (e.g. "2026-9")
+    [year, month] = String(monthRaw).split('-').map(Number);
+  } else {
+    year  = parseInt(document.getElementById('inputYear')?.value) || 2026;
+    month = parseInt(monthRaw) || 9;
+  }
   return {
     year,
     month,
@@ -356,7 +369,49 @@ function getSearchParams() {
   };
 }
 
+// Query string shared by /api/stats and /api/results — carries the route so the
+// server reads the right per-route cache folder.
+function dataQuery(params) {
+  return `year=${params.year}&month=${params.month}`
+    + `&origin=${encodeURIComponent(params.originQuery)}`
+    + `&dest=${encodeURIComponent(params.destinationQuery)}`;
+}
+
+// Dynamic mode: fill the "已存航線" dropdown from cached routes so you can
+// jump between destinations without retyping. Selecting one fills origin/dest.
+async function populateRoutes() {
+  const sel = document.getElementById('routeSwitcher');
+  if (!sel || IS_STATIC) return;
+  try {
+    const { routes } = await (await fetch('/api/routes')).json();
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— 已存航線 —</option>';
+    (routes || []).forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.label;                       // "臺北→首爾"
+      opt.textContent = r.label.replace('→', ' → ');
+      sel.appendChild(opt);
+    });
+    sel.value = cur;
+  } catch {}
+}
+
+function onRouteSwitch() {
+  const label = document.getElementById('routeSwitcher').value;
+  if (!label) return;
+  const [o, d] = label.split('→');
+  const oEl = document.getElementById('inputOrigin');
+  const dEl = document.getElementById('inputDest');
+  if (oEl) oEl.value = (o || '').trim();
+  if (dEl) dEl.value = (d || '').trim();
+  updateSubtitle();
+  updateQueryCount();
+  saveSettings();
+  loadData();
+}
+
 function updateSubtitle() {
+  if (IS_STATIC) { updateSubtitleStatic(); return; }
   const p = getSearchParams();
   const stayStr = p.stays.length <= 3
     ? p.stays.join('、') + '天'
@@ -381,7 +436,7 @@ async function startSearch() {
   updateProgress(0, total);
 
   try {
-    const qs = `year=${params.year}&month=${params.month}`;
+    const qs = dataQuery(params);
     const baselineRes = await fetch(`/api/stats?${qs}`);
     const baseline = (await baselineRes.json()).totalSearches;
 
@@ -391,7 +446,7 @@ async function startSearch() {
       body: JSON.stringify(params),
     });
 
-    await pollResults(total, baseline, params.year, params.month);
+    await pollResults(total, baseline, params);
   } catch (err) {
     addLog('error', `❌ 查詢失敗: ${err.message}`);
   }
@@ -400,11 +455,13 @@ async function startSearch() {
   btn.disabled = false;
 }
 
-async function pollResults(total, baseline = 0, year = 2026, month = 9) {
+async function pollResults(total, baseline = 0, params = {}) {
   const maxAttempts = 180;
   let lastCount = 0;
   let stagnant = 0;
-  const qs = `year=${year}&month=${month}`;
+  const year = params.year || 2026;
+  const month = params.month || 9;
+  const qs = dataQuery(params);
 
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(r => setTimeout(r, 5000));
@@ -421,6 +478,7 @@ async function pollResults(total, baseline = 0, year = 2026, month = 9) {
   }
 
   await loadData();
+  populateRoutes();
   updateProgress(total, total);
 }
 
@@ -710,6 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initStayChips(saved?.stays || null);
   loadData();
+  populateRoutes();
   updateSubtitle();
 
   ['inputOrigin', 'inputDest', 'inputYear', 'inputMonth'].forEach(id => {
@@ -721,6 +780,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', loadData);
   });
+
+  document.getElementById('routeSwitcher')?.addEventListener('change', onRouteSwitch);
 
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('auto') === '1') startSearch();
@@ -829,11 +890,12 @@ function applyStaticData(data, params) {
 
 async function loadDataStatic() {
   const params = getSearchParams();
+  if (!staticSlug) { renderStaticEmpty(params); return; }
   const fileKey = `${params.year}-${params.month}`;
 
   let res;
   try {
-    res = await fetch(`data/${fileKey}.json`, { cache: 'no-store' });
+    res = await fetch(`data/${staticSlug}/${fileKey}.json`, { cache: 'no-store' });
   } catch { res = null; }
 
   if (!res || !res.ok) { renderStaticEmpty(params); return; } // no data for this month — no password needed
@@ -856,7 +918,42 @@ async function loadDataStatic() {
   }
 }
 
-function initStaticMode() {
+// Subtitle for the read-only site — driven by the selected route + month.
+function updateSubtitleStatic() {
+  const sub = document.getElementById('subtitle');
+  if (!sub) return;
+  const route = (staticManifest?.routes || []).find(r => r.slug === staticSlug);
+  const monthSel = document.getElementById('inputMonth');
+  const monthLabel = monthSel?.selectedOptions?.[0]?.textContent || '';
+  sub.textContent = route ? `${route.label.replace('→', ' → ')} · ${monthLabel} · 來回` : '';
+}
+
+// Rebuild the month <select> for the chosen route and load its newest month.
+function selectStaticRoute(slug, saved) {
+  staticSlug = slug;
+  const route = (staticManifest?.routes || []).find(r => r.slug === slug);
+  const monthSel = document.getElementById('inputMonth');
+  monthSel.innerHTML = '';
+  (route?.months || []).forEach(mo => {
+    const opt = document.createElement('option');
+    opt.value = `${mo.year}-${mo.month}`;      // getSearchParams parses "year-month"
+    opt.textContent = mo.label;
+    monthSel.appendChild(opt);
+  });
+
+  let chosen = route?.months?.[route.months.length - 1]; // default: newest month
+  if (saved?.year && saved?.month) {
+    const found = route?.months?.find(mo => mo.year === saved.year && mo.month === saved.month);
+    if (found) chosen = found;
+  }
+  if (chosen) monthSel.value = `${chosen.year}-${chosen.month}`;
+
+  saveSettings();
+  updateSubtitle();
+  loadData();
+}
+
+async function initStaticMode() {
   document.body.classList.add('static-mode');
   injectPasswordOverlay();
 
@@ -866,22 +963,38 @@ function initStaticMode() {
   document.querySelector('.settings-row--sliders')?.remove();
   document.getElementById('inputOrigin')?.closest('.settings-field')?.remove();
   document.getElementById('inputDest')?.closest('.settings-field')?.remove();
+  document.getElementById('inputYear')?.closest('.settings-field')?.remove();
   document.querySelector('.search-settings .arrow')?.remove();
 
-  // Restore year/month selection
-  const saved = loadSettings();
-  if (saved) {
-    const y = document.getElementById('inputYear');
-    const m = document.getElementById('inputMonth');
-    if (y && saved.year)  y.value = saved.year;
-    if (m && saved.month) m.value = saved.month;
+  // Load the plaintext manifest (routes + months only — no prices)
+  try {
+    staticManifest = await (await fetch('data/manifest.json', { cache: 'no-store' })).json();
+  } catch { staticManifest = { routes: [] }; }
+
+  const routes = staticManifest.routes || [];
+  const routeSel = document.getElementById('routeSwitcher');
+  routeSel.innerHTML = '';
+
+  if (routes.length === 0) {
+    routeSel.innerHTML = '<option value="">（尚無資料）</option>';
+    renderStaticEmpty(getSearchParams());
+    return;
   }
 
-  updateSubtitle();
-  loadData();
-
-  ['inputYear', 'inputMonth'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => { saveSettings(); updateSubtitle(); loadData(); });
+  routes.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.slug;
+    opt.textContent = r.label.replace('→', ' → ');
+    routeSel.appendChild(opt);
   });
+
+  routeSel.addEventListener('change', () => selectStaticRoute(routeSel.value));
+  document.getElementById('inputMonth').addEventListener('change', () => {
+    saveSettings(); updateSubtitle(); loadData();
+  });
+
+  const saved = loadSettings();
+  const initial = routes.find(r => r.slug === saved?.slug) || routes[0];
+  routeSel.value = initial.slug;
+  selectStaticRoute(initial.slug, saved);
 }

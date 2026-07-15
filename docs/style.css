@@ -389,6 +389,13 @@ footer {
   cursor: pointer;
 }
 
+/* Route switcher shows full "臺北 → 首爾" labels, so it needs more room */
+#routeSwitcher {
+  width: auto;
+  min-width: 150px;
+  max-width: 260px;
+}
+
 /* ============================================
    Settings chip row
    ============================================ */

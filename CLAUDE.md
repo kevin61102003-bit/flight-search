@@ -5,7 +5,7 @@ Google Flights 價格追蹤器。用 Puppeteer 爬取指定月份的來回機票
 ## 啟動
 
 ```
-start-server.bat   # 啟動 server(port 3000) + ngrok + 開瀏覽器
+start-server.bat   # 啟動 server(port 3000) + 開瀏覽器（桌面「機票查詢」捷徑指向此）
 node test-cache.js # 執行測試
 ```
 
@@ -13,7 +13,8 @@ node test-cache.js # 執行測試
 
 | 檔案 | 職責 |
 |---|---|
-| `cache.js` | 檔案型 JSON 快取，資料存在 `cache/YYYY-MM/` 子目錄 |
+| `cache.js` | 檔案型 JSON 快取，**依航線分開**存在 `cache/routes/<slug>/YYYY-MM/` |
+| `migrate-cache.js` | 一次性：把舊的扁平/月份快取遷移到 `cache/routes/<slug>/`（依 `data.route` 還原航線） |
 | `scraper.js` | Puppeteer 爬蟲，爬單筆或整月的 Google Flights |
 | `server.js` | Express API server，提供資料給前端 |
 | `public/index.html` | 設定面板 HTML |
@@ -30,13 +31,16 @@ UI (app.js)
   → POST /api/search (server.js)
     → scrapeAll(dates, stays, opts) (scraper.js)
       → scrapeSingle(date, returnDate, browser, opts)
-        → cache.set(key, data, year, month) (cache.js)
+        → slug = cache.routeSlug(origin, destination)   // base64url("出發→目的")
+        → cache.set(key, data, slug, year, month) (cache.js)
               ↓
-           cache/YYYY-MM/*.json
+           cache/routes/<slug>/YYYY-MM/*.json   ← 每條航線各自一個資料夾，不再互相覆蓋
 
 UI loadData()
-  → GET /api/results?year=&month= (server.js)
-    → cache.getAll(year, month) → { flights, lastUpdated }
+  → GET /api/results?year=&month=&origin=&dest= (server.js)
+    → cache.getAll(slug, year, month) → { flights, lastUpdated }
+
+航線切換：GET /api/routes → 前端「已存航線」下拉；靜態站則讀 docs/data/manifest.json 的 routes
 ```
 
 ## Cache API
@@ -71,11 +75,13 @@ generateDates(year, month)  // 回傳該月每天的 'YYYY-MM-DD' 陣列
 
 | Endpoint | 用途 |
 |---|---|
-| `GET /api/results?year=&month=` | 取快取資料 |
-| `GET /api/stats?year=&month=` | 取統計摘要（含 lastUpdated） |
+| `GET /api/results?year=&month=&origin=&dest=` | 取某航線某月快取資料 |
+| `GET /api/stats?year=&month=&origin=&dest=` | 取某航線某月統計摘要（含 lastUpdated） |
+| `GET /api/routes` | 列出所有有資料的航線與其月份（前端「已存航線」下拉用） |
 | `POST /api/search` | 觸發爬蟲（背景執行） |
-| `POST /api/clear-cache` | 帶 `{year,month}` 清單月；不帶清全部 |
+| `POST /api/clear-cache` | 帶 `{year,month,origin,dest}` 清單一航線的單月；不帶清全部 |
 | `GET /api/clear-cache` | 清全部 |
+| `POST /api/publish` | 加密 `docs/` → git commit → git push（前端「📤 發布到網站」按鈕）；靠已快取的 git 憑證免登入 |
 
 POST /api/search body：
 ```json
@@ -145,14 +151,15 @@ cache/ ──build-static.js(加密)──► docs/ ──git push──► GitH
 - `npm run build:static` 產生 `docs/`（每次會先清空 docs/，避免殘留檔外流）。
 - 加密：**AES-256-GCM + PBKDF2(15 萬次)**，Node 與瀏覽器兩端都用內建 `crypto.subtle`，**免安裝套件**。`build-static.js` 的 `encryptObj()` 與 `app.js` 的 `decryptPayload()` 參數必須一致。
 - 密碼來源：`FLIGHT_PW` 環境變數 或 `.viewer-password` 檔（已 gitignore）。
-- 靜態模式偵測：`config.js` 的 `window.APP_MODE`。`IS_STATIC` 時 `app.js` 改讀 `data/<year>-<month>.json` 並跳密碼框（記在 localStorage key `flightViewerPw`），同時移除爬取/清除等只能在本機用的控制項。
-- 加密檔名用**未補零的月份**（`2026-9.json`）以對上 `getSearchParams()` 的 `month`。
+- 靜態模式偵測：`config.js` 的 `window.APP_MODE`。`IS_STATIC` 時 `app.js` 改讀 `data/<slug>/<year>-<month>.json` 並跳密碼框（記在 localStorage key `flightViewerPw`），同時移除爬取/清除等只能在本機用的控制項；航線與月份改由 `manifest.json` 的 routes 驅動「已存航線」下拉。
+- 加密檔名用**未補零的月份**（`2026-9.json`）以對上 `getSearchParams()` 的 `month`；上層資料夾是 `routeSlug`（base64url）。
 - ⚠️ `cache/` 含未加密價格，已 gitignore，**切勿上傳**（公開 repo 會破功）。
 - 完整步驟見 `DEPLOY.md`；Windows 一鍵發布用 `publish.bat`。
 
 ## 注意事項
 
 - Node.js 路徑：`E:\dev\node\node.exe`（系統 PATH 可能沒有 node）
-- 快取舊資料（`cache/` 根目錄的 .json）不會被讀取，已改為子目錄結構
+- 快取依航線分開：`cache/routes/<slug>/YYYY-MM/`。`slug = base64url("出發→目的")`，避免不同中文目的地被 `sanitize()` 壓成同一串底線而互相覆蓋
+- 舊格式（`cache/` 根目錄或 `cache/YYYY-MM/` 的扁平檔）已用 `migrate-cache.js` 遷移；舊檔保留為備份、不會被讀取，確認無誤後可手動刪除
 - `CONCURRENCY` 常數在 scraper.js 控制並行爬取數
 - debug 截圖存在 `debug/` 目錄

@@ -1,11 +1,41 @@
 {
-  "months": [
+  "routes": [
     {
-      "year": 2026,
-      "month": 9,
-      "label": "2026年9月",
-      "count": 150
+      "slug": "6Ie65YyX4oaS6aaW54i-",
+      "label": "臺北→首爾",
+      "months": [
+        {
+          "year": 2026,
+          "month": 8,
+          "label": "2026年8月",
+          "count": 31
+        },
+        {
+          "year": 2026,
+          "month": 9,
+          "label": "2026年9月",
+          "count": 18
+        }
+      ]
+    },
+    {
+      "slug": "6Ie65YyX4oaS6Yec5bGx",
+      "label": "臺北→釜山",
+      "months": [
+        {
+          "year": 2026,
+          "month": 8,
+          "label": "2026年8月",
+          "count": 4
+        },
+        {
+          "year": 2026,
+          "month": 9,
+          "label": "2026年9月",
+          "count": 116
+        }
+      ]
     }
   ],
-  "generatedAt": "2026-07-15T05:23:36.133Z"
+  "generatedAt": "2026-07-15T06:07:34.152Z"
 }

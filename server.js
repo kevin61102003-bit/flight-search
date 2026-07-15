@@ -25,10 +25,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/results', (req, res) => {
   const year = parseInt(req.query.year) || 2026;
   const month = parseInt(req.query.month) || 9;
+  const slug = cache.routeSlug(req.query.origin || '臺北', req.query.dest || '釜山');
   res.json({
-    flights: cache.getAll(year, month),
-    lastUpdated: cache.getLastUpdated(year, month),
+    flights: cache.getAll(slug, year, month),
+    lastUpdated: cache.getLastUpdated(slug, year, month),
   });
+});
+
+/**
+ * GET /api/routes
+ * List every route that has cached data, with the months each covers.
+ */
+app.get('/api/routes', (req, res) => {
+  res.json({ routes: cache.listRoutes() });
 });
 
 /**
@@ -38,7 +47,8 @@ app.get('/api/results', (req, res) => {
 app.get('/api/stats', (req, res) => {
   const year = parseInt(req.query.year) || 2026;
   const month = parseInt(req.query.month) || 9;
-  const allData = cache.getAll(year, month);
+  const slug = cache.routeSlug(req.query.origin || '臺北', req.query.dest || '釜山');
+  const allData = cache.getAll(slug, year, month);
   const allFlights = Object.values(allData).flat();
   const total = allFlights.length;
   const withPrices = allFlights.filter(f => f.price !== null);
@@ -53,7 +63,7 @@ app.get('/api/stats', (req, res) => {
       ? { date: cheapest.date, returnDate: cheapest.returnDate, price: cheapest.price }
       : null,
     dates: Object.keys(allData).sort(),
-    lastUpdated: cache.getLastUpdated(year, month),
+    lastUpdated: cache.getLastUpdated(slug, year, month),
   });
 });
 
@@ -108,9 +118,10 @@ app.get('/api/clear-cache', (req, res) => {
 });
 
 app.post('/api/clear-cache', (req, res) => {
-  const { year, month } = req.body || {};
+  const { year, month, origin, dest } = req.body || {};
   if (year && month) {
-    cache.clearMonth(Number(year), Number(month));
+    const slug = cache.routeSlug(origin || '臺北', dest || '釜山');
+    cache.clearMonth(slug, Number(year), Number(month));
     res.json({ message: `Cache cleared for ${year}-${String(month).padStart(2,'0')}`, count: 0 });
   } else {
     const count = cache.clear();
