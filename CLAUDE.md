@@ -18,7 +18,9 @@ node test-cache.js # 執行測試
 | `server.js` | Express API server，提供資料給前端 |
 | `public/index.html` | 設定面板 HTML |
 | `public/style.css` | 樣式（含 chip、雙軌滑桿） |
-| `public/app.js` | 前端邏輯，連接 UI 與 API |
+| `public/app.js` | 前端邏輯，連接 UI 與 API；含靜態模式（加密解密、密碼閘門） |
+| `public/config.js` | 設定 `window.APP_MODE`（本機=`dynamic`；build 產出=`static`） |
+| `build-static.js` | 讀 `cache/` → AES 加密 → 產生 `docs/` 給 GitHub Pages |
 | `test-cache.js` | cache.js 的 assert-based 測試 |
 
 ## 資料流
@@ -128,6 +130,25 @@ loadSettings()   // DOMContentLoaded 時呼叫，回傳物件或 null
 ```
 
 新增可持久化的設定欄位時：在 `saveSettings()` 加欄位，在 `DOMContentLoaded` 的還原區塊加對應讀回邏輯。
+
+## 部署（GitHub Pages 加密靜態版）
+
+目標：本機關機時，唯讀展示網站仍活著。作法是**兩個角色分離**：
+
+- **本機**：跑爬蟲（puppeteer）產生 `cache/`。只在要更新價格時開。
+- **GitHub Pages**：24h 常開的唯讀網站，讀 `docs/data/*.json`（AES 加密）。
+
+```
+cache/ ──build-static.js(加密)──► docs/ ──git push──► GitHub Pages
+```
+
+- `npm run build:static` 產生 `docs/`（每次會先清空 docs/，避免殘留檔外流）。
+- 加密：**AES-256-GCM + PBKDF2(15 萬次)**，Node 與瀏覽器兩端都用內建 `crypto.subtle`，**免安裝套件**。`build-static.js` 的 `encryptObj()` 與 `app.js` 的 `decryptPayload()` 參數必須一致。
+- 密碼來源：`FLIGHT_PW` 環境變數 或 `.viewer-password` 檔（已 gitignore）。
+- 靜態模式偵測：`config.js` 的 `window.APP_MODE`。`IS_STATIC` 時 `app.js` 改讀 `data/<year>-<month>.json` 並跳密碼框（記在 localStorage key `flightViewerPw`），同時移除爬取/清除等只能在本機用的控制項。
+- 加密檔名用**未補零的月份**（`2026-9.json`）以對上 `getSearchParams()` 的 `month`。
+- ⚠️ `cache/` 含未加密價格，已 gitignore，**切勿上傳**（公開 repo 會破功）。
+- 完整步驟見 `DEPLOY.md`；Windows 一鍵發布用 `publish.bat`。
 
 ## 注意事項
 

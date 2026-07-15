@@ -1,0 +1,18 @@
+{
+  "name": "flight-search",
+  "version": "1.0.0",
+  "description": "Google Flights price tracker - TPE to PUS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "scrape-all": "node server.js --scrape-all",
+    "build:static": "node build-static.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^22.0.0"
+  },
+  "allowScripts": {
+    "puppeteer@22.15.0": true
+  }
+}
