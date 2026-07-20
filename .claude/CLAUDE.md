@@ -163,3 +163,22 @@ cache/ ──build-static.js(加密)──► docs/ ──git push──► GitH
 - 舊格式（`cache/` 根目錄或 `cache/YYYY-MM/` 的扁平檔）已用 `migrate-cache.js` 遷移；舊檔保留為備份、不會被讀取，確認無誤後可手動刪除
 - `CONCURRENCY` 常數在 scraper.js 控制並行爬取數
 - debug 截圖存在 `debug/` 目錄
+
+## 目前狀態（2026-07-15，已全部發布同步）
+
+- ✅ 航線分開保存：`cache/routes/<base64url(出發→目的)>/YYYY-MM/`，首爾/釜山不再互蓋（舊資料已用 `migrate-cache.js` 遷移）。
+- ✅ UI：「已存航線」下拉切換；按鈕拆成「🔍開始查詢(增量)」「🗑️清除快取(只清當前航線+月,含確認視窗)」「📤發布到網站」；全部加了 hover 說明(tooltip)。
+- ⏸️ 刻意暫緩：兩筆爬蟲失敗的 bug（使用者說先不管）。
+
+## 部署方式
+
+- 每日流程：雙擊桌面「機票查詢」(=`start-server.bat`) → localhost:3000 爬 → 按「📤 發布到網站」→ 關機。
+- 網站與本機脫鉤，電腦關了網站仍在。
+- 靜態站密碼放 `.viewer-password`（已 gitignore，切勿上傳）。
+
+## 改 Code 守則
+
+- 改 code 只留本機、回報使用者。
+- **要上線由使用者按發布按鈕觸發，我不主動 push**（此流程使用者已確認 OK）。
+- 發布按鈕跑 `build-static.js`→`git add -A`→commit→push（憑證已快取，免登入）。
+- 功能完成後更新 CLAUDE.md（見下方相關記憶的指引）。

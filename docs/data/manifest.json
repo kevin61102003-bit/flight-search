@@ -1,6 +1,30 @@
 {
   "routes": [
     {
+      "slug": "6Ie65YyX4oaS5aSn6Ziq",
+      "label": "臺北→大阪",
+      "months": [
+        {
+          "year": 2026,
+          "month": 10,
+          "label": "2026年10月",
+          "count": 93
+        }
+      ]
+    },
+    {
+      "slug": "6Ie65YyX4oaS5pu86LC3",
+      "label": "臺北→曼谷",
+      "months": [
+        {
+          "year": 2026,
+          "month": 8,
+          "label": "2026年8月",
+          "count": 62
+        }
+      ]
+    },
+    {
       "slug": "6Ie65YyX4oaS6aaW54i-",
       "label": "臺北→首爾",
       "months": [
@@ -37,5 +61,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-07-15T06:37:17.177Z"
+  "generatedAt": "2026-07-20T07:24:25.355Z"
 }
