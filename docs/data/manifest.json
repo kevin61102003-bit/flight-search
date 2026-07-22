@@ -13,6 +13,18 @@
       ]
     },
     {
+      "slug": "6Ie65YyX4oaS5p2x5Lqs",
+      "label": "臺北→東京",
+      "months": [
+        {
+          "year": 2026,
+          "month": 10,
+          "label": "2026年10月",
+          "count": 93
+        }
+      ]
+    },
+    {
       "slug": "6Ie65YyX4oaS5pu86LC3",
       "label": "臺北→曼谷",
       "months": [
@@ -61,5 +73,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-07-20T07:24:25.355Z"
+  "generatedAt": "2026-07-22T02:13:30.295Z"
 }
