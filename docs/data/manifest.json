@@ -1,6 +1,18 @@
 {
   "routes": [
     {
+      "slug": "5riF6YKB4oaS6Yec5bGx",
+      "label": "清邁→釜山",
+      "months": [
+        {
+          "year": 2026,
+          "month": 12,
+          "label": "2026年12月",
+          "count": 24
+        }
+      ]
+    },
+    {
       "slug": "6Ie65YyX4oaS5aSn6Ziq",
       "label": "臺北→大阪",
       "months": [
@@ -21,6 +33,12 @@
           "month": 10,
           "label": "2026年10月",
           "count": 93
+        },
+        {
+          "year": 2026,
+          "month": 11,
+          "label": "2026年11月",
+          "count": 30
         }
       ]
     },
@@ -73,5 +91,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-07-22T02:13:30.295Z"
+  "generatedAt": "2026-08-12T09:31:16.170Z"
 }
