@@ -108,19 +108,41 @@ async function scrapeSingle(date, returnDate, browser, opts = {}) {
     await sleep(500);
 
     await page.keyboard.type(destinationQuery, { delay: 100 });
+    // Google 的地點建議是非同步載入的：「任何地方 / Anywhere」等固定選項會先出現，
+    // 真正的地點結果稍後才來。機場那一列一定帶「距離目的地 N 公里」，用它當「建議
+    // 已載入」的訊號，避免搶先誤選到固定選項。
     await page.waitForFunction(
-      (q) => Array.from(document.querySelectorAll('[role="option"]')).some(el => el.textContent.includes(q)),
-      { timeout: 8000 },
-      destinationQuery
+      () => Array.from(document.querySelectorAll('[role="option"]')).some(el => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && (el.innerText || '').includes('距離目的地');
+      }),
+      { timeout: 12000 }
     );
+    await sleep(400); // 讓建議清單穩定
 
+    // 選建議：排除「任何地方 / Anywhere」等非地點選項；優先「文字或 aria 含查詢字」者，
+    // 其次第一個「城市／地區」列（不含機場字樣，會涵蓋該地所有機場），再退回第一個地點
+    // 選項（通常是機場）。多機場地區名稱未必含查詢字，例如「峇里島」在 Google 是「印尼峇里省」。
     const optCoords = await page.evaluate((q) => {
-      const opt = Array.from(document.querySelectorAll('[role="option"]')).find(el => el.textContent.includes(q));
-      if (!opt) return null;
-      const r = opt.getBoundingClientRect();
-      return { x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2) };
+      const isVisible = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && el.offsetParent !== null; };
+      const norm = s => (s || '').toLowerCase();
+      const BAD = ['任何地方', 'anywhere', 'explore', '探索'];
+      const geo = Array.from(document.querySelectorAll('[role="option"]'))
+        .filter(el => isVisible(el) && (el.getAttribute('aria-label') || '').trim().length > 0)
+        .filter(el => !BAD.some(b => norm(el.getAttribute('aria-label')).includes(b)));
+      if (!geo.length) return null;
+      const isAirport = el => {
+        const t = el.innerText || '';
+        return t.includes('距離目的地') || t.includes('機場') || /\([A-Z]{3}\)/.test(el.getAttribute('aria-label') || '');
+      };
+      const match = geo.find(el => norm(el.getAttribute('aria-label')).includes(norm(q)) || norm(el.innerText).includes(norm(q)));
+      const city = geo.find(el => !isAirport(el));
+      const pick = match || city || geo[0];
+      const r = pick.getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), label: pick.getAttribute('aria-label') || '' };
     }, destinationQuery);
     if (!optCoords) throw new Error(`Autocomplete option not found for: ${destinationQuery}`);
+    console.log(`  [DEST]   目的地建議 → ${optCoords.label}`);
     await page.mouse.click(optCoords.x, optCoords.y);
     await sleep(800);
 
@@ -215,17 +237,33 @@ async function scrapeSingle(date, returnDate, browser, opts = {}) {
     if (!searchCoords) throw new Error('Search button not found');
     await page.mouse.click(searchCoords.x, searchCoords.y);
 
-    // === Wait for results ===
-    await page.waitForFunction(
-      () => {
-        const text = document.body.innerText;
-        return text.includes('NT$') ||
-               text.includes('最低價格') ||
-               text.includes('最低票價') ||
-               (text.includes('$') && (text.includes('航班') || text.includes('直達') || text.includes('班機')));
-      },
-      { timeout: 45000, polling: 1500 }
-    );
+    // === Wait for results（含「系統發生錯誤」頁自動重載重試）===
+    // Google 偶爾在結果頁回「糟糕！系統發生錯誤」（附「重新載入」鈕），多為暫時性。
+    // 偵測到就 reload 同一搜尋 URL 重試，等同幫使用者按那顆重新載入。
+    const RESULTS_READY = () => {
+      const t = document.body.innerText || '';
+      if (t.includes('系統發生錯誤') || t.includes('Something went wrong')) return true; // 交給外層判斷
+      return t.includes('NT$') || t.includes('最低價格') || t.includes('最低票價') ||
+        (t.includes('$') && (t.includes('航班') || t.includes('直達') || t.includes('班機')));
+    };
+    let gotResults = false;
+    for (let tryN = 0; tryN < 3 && !gotResults; tryN++) {
+      try {
+        await page.waitForFunction(RESULTS_READY, { timeout: 45000, polling: 1500 });
+      } catch (_) { /* 逾時，往下判斷是不是錯誤頁 */ }
+      const isErr = await page.evaluate(() => {
+        const t = document.body.innerText || '';
+        return (t.includes('系統發生錯誤') || t.includes('Something went wrong')) && !t.includes('NT$');
+      });
+      if (isErr) {
+        console.log(`  [RETRY]  ${date} → ${returnDate}: Google 系統錯誤頁，重新載入 (${tryN + 1}/3)`);
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+        await sleep(3000);
+      } else {
+        gotResults = true;
+      }
+    }
+    if (!gotResults) throw new Error('結果頁反覆系統錯誤（已重試 3 次）');
     await sleep(1500);
 
     // === Click cheapest qualifying outbound → navigate to return selection ===

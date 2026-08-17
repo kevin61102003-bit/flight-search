@@ -434,6 +434,46 @@ footer {
 /* Hidden */
 .hidden { display: none; }
 
+/* ── 機場自動完成下拉 ───────────────────────────── */
+.ac-anchor { position: relative; }
+.ac-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  z-index: 300;
+}
+.ac-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+}
+.ac-item:hover,
+.ac-item.active { background: #eef2ff; }
+.ac-iata {
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--primary);
+  min-width: 40px;
+}
+.ac-city { color: var(--text); }
+.ac-country {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-light);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   header {

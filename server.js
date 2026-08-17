@@ -1,5 +1,7 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const util = require('util');
 const { exec } = require('child_process');
 const cache = require('./cache');
@@ -12,6 +14,42 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
+
+// ── 外網密碼閘 ──────────────────────────────────────────────
+// 本機（localhost）免密碼；從 ngrok 等外部 Host 進來的請求要求 HTTP Basic Auth。
+// 密碼沿用靜態站的 .viewer-password（或 FLIGHT_PW 環境變數）。
+// 沒設密碼時不改變原行為（本機開發照舊）。
+function getViewerPassword() {
+  if (process.env.FLIGHT_PW) return process.env.FLIGHT_PW.trim();
+  try {
+    const pw = fs.readFileSync(path.join(__dirname, '.viewer-password'), 'utf8').trim();
+    if (pw) return pw;
+  } catch { /* 沒有檔案就當作沒設密碼 */ }
+  return null;
+}
+function isLocalRequest(req) {
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+}
+app.use((req, res, next) => {
+  if (isLocalRequest(req)) return next();          // 本機直接放行
+  const pw = getViewerPassword();
+  if (!pw) return next();                           // 沒設密碼 → 不擋（維持原行為）
+  const [scheme, encoded] = (req.headers.authorization || '').split(' ');
+  if (scheme === 'Basic' && encoded) {
+    const decoded = Buffer.from(encoded, 'base64').toString('utf8');
+    const supplied = decoded.slice(decoded.indexOf(':') + 1); // 使用者名稱不限，只比對密碼
+    if (safeEqual(supplied, pw)) return next();
+  }
+  res.set('WWW-Authenticate', 'Basic realm="Flight Search", charset="UTF-8"');
+  return res.status(401).send('需要密碼 / Password required');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================

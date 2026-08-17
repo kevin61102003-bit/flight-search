@@ -90,7 +90,7 @@ async function main() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 
   // 1. Copy front-end assets (config.js is overwritten to static below)
-  for (const f of ['index.html', 'style.css', 'app.js']) {
+  for (const f of ['index.html', 'style.css', 'app.js', 'airports.js']) {
     fs.copyFileSync(path.join(PUBLIC_DIR, f), path.join(DOCS_DIR, f));
   }
   fs.writeFileSync(path.join(DOCS_DIR, 'config.js'),

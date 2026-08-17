@@ -25,6 +25,18 @@
       ]
     },
     {
+      "slug": "6Ie65YyX4oaS5bOH5Y6Y5bO2",
+      "label": "臺北→峇厘島",
+      "months": [
+        {
+          "year": 2026,
+          "month": 10,
+          "label": "2026年10月",
+          "count": 31
+        }
+      ]
+    },
+    {
       "slug": "6Ie65YyX4oaS5p2x5Lqs",
       "label": "臺北→東京",
       "months": [
@@ -51,6 +63,18 @@
           "month": 8,
           "label": "2026年8月",
           "count": 62
+        }
+      ]
+    },
+    {
+      "slug": "6Ie65YyX4oaS5pyt5bmM",
+      "label": "臺北→札幌",
+      "months": [
+        {
+          "year": 2026,
+          "month": 11,
+          "label": "2026年11月",
+          "count": 30
         }
       ]
     },
@@ -86,10 +110,10 @@
           "year": 2026,
           "month": 9,
           "label": "2026年9月",
-          "count": 90
+          "count": 120
         }
       ]
     }
   ],
-  "generatedAt": "2026-08-12T09:31:16.170Z"
+  "generatedAt": "2026-08-17T03:39:12.695Z"
 }

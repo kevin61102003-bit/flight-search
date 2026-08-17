@@ -174,6 +174,8 @@ function saveSettings() {
       year:  p.year,
       month: p.month,
       slug:  IS_STATIC ? staticSlug : undefined,
+      originQuery:      p.originQuery,       // 記住當前航線，重刷後留在同一頁
+      destinationQuery: p.destinationQuery,
       stays: getSelectedStays(),
       customStays: [...customStays],
       outboundTimeRange: getTimeRange('outboundMin', 'outboundMax'),
@@ -384,7 +386,9 @@ async function populateRoutes() {
   if (!sel || IS_STATIC) return;
   try {
     const { routes } = await (await fetch('/api/routes')).json();
-    const cur = sel.value;
+    // 沒選過就用當前表單的航線，讓下拉顯示成正在看的那條（重刷後不會空白）
+    const p = getSearchParams();
+    const cur = sel.value || `${p.originQuery}→${p.destinationQuery}`;
     sel.innerHTML = '<option value="">— 已存航線 —</option>';
     (routes || []).forEach(r => {
       const opt = document.createElement('option');
@@ -410,6 +414,87 @@ function onRouteSwitch() {
   loadData();
 }
 
+// ── 機場自動完成 ─────────────────────────────────────────────
+// 出發地／目的地輸入時，在下方顯示符合的機場（IATA + 城市 + 國家），
+// 點選後把「中文城市名」填回輸入框（維持航線快取 key 不變）。
+function normalizeQuery(s) {
+  return String(s || '').toLowerCase().replace(/臺/g, '台').trim();
+}
+function matchAirports(query, limit = 8) {
+  const q = normalizeQuery(query);
+  if (!q) return [];
+  const list = window.AIRPORTS || [];
+  const scored = [];
+  for (const a of list) {
+    const cityN = normalizeQuery(a.city);
+    const iataN = a.iata.toLowerCase();
+    const hay = normalizeQuery(`${a.iata} ${a.city} ${a.country} ${a.alt || ''}`);
+    let score = -1;
+    if (iataN === q) score = 100;
+    else if (cityN === q) score = 90;
+    else if (cityN.startsWith(q)) score = 80;
+    else if (iataN.startsWith(q)) score = 70;
+    else if (hay.includes(q)) score = 40;
+    if (score >= 0) scored.push({ a, score });
+  }
+  scored.sort((x, y) => y.score - x.score);
+  return scored.slice(0, limit).map(s => s.a);
+}
+function attachAirportAutocomplete(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input || !window.AIRPORTS) return;
+  const field = input.closest('.settings-field') || input.parentElement;
+  field.classList.add('ac-anchor');
+  const box = document.createElement('div');
+  box.className = 'ac-list hidden';
+  field.appendChild(box);
+
+  let items = [];
+  let active = -1;
+
+  const close = () => { box.classList.add('hidden'); active = -1; };
+  function render(list) {
+    items = list;
+    active = -1;
+    if (!list.length) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+    box.innerHTML = list.map((a, i) =>
+      `<div class="ac-item" data-i="${i}">`
+      + `<span class="ac-iata">${a.iata}</span>`
+      + `<span class="ac-city">${a.city}</span>`
+      + `<span class="ac-country">${a.country}</span>`
+      + `</div>`).join('');
+    box.classList.remove('hidden');
+  }
+  function setActive(i) {
+    const els = box.querySelectorAll('.ac-item');
+    els.forEach(el => el.classList.remove('active'));
+    if (i >= 0 && els[i]) { els[i].classList.add('active'); els[i].scrollIntoView({ block: 'nearest' }); }
+    active = i;
+  }
+  function choose(i) {
+    const a = items[i];
+    if (!a) return;
+    input.value = a.city;                 // 填中文城市名，不含 IATA，維持快取 key
+    close();
+    updateSubtitle(); updateQueryCount(); saveSettings();  // 沿用既有更新流程
+  }
+
+  input.addEventListener('input', () => render(matchAirports(input.value)));
+  input.addEventListener('focus', () => { if (input.value.trim()) render(matchAirports(input.value)); });
+  input.addEventListener('keydown', (e) => {
+    if (box.classList.contains('hidden')) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(Math.min(active + 1, items.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(active - 1, 0)); }
+    else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); choose(active); }
+    else if (e.key === 'Escape') { close(); }
+  });
+  box.addEventListener('mousedown', (e) => {   // mousedown 先於 blur，確保點得到
+    const item = e.target.closest('.ac-item');
+    if (item) { e.preventDefault(); choose(Number(item.dataset.i)); }
+  });
+  input.addEventListener('blur', () => setTimeout(close, 150));
+}
+
 function updateSubtitle() {
   if (IS_STATIC) { updateSubtitleStatic(); return; }
   const p = getSearchParams();
@@ -418,6 +503,8 @@ function updateSubtitle() {
     : `${p.stays[0]}–${p.stays[p.stays.length - 1]}天`;
   const sub = document.getElementById('subtitle');
   if (sub) sub.textContent = `${p.year} 年 ${p.month} 月 · 來回 · ${p.originQuery} → ${p.destinationQuery} · 停留 ${stayStr}`;
+  const title = document.getElementById('mainTitle');
+  if (title) title.textContent = `✈️ ${p.originQuery} → ${p.destinationQuery} 機票價格追蹤`;
 }
 
 async function startSearch() {
@@ -469,8 +556,8 @@ async function pollResults(total, baseline = 0, params = {}) {
     const stats = await res.json();
     const newCount = Math.max(0, stats.totalSearches - baseline);
     updateProgress(newCount, total);
-    updateSummaryCards(stats);
-    updateLastUpdated(stats.lastUpdated, year, month);
+    // 每輪都重新載入表格＋圖表，票價一筆筆進來就即時看到，不用重刷網頁
+    await loadData();
 
     if (stats.totalSearches === lastCount) { stagnant++; } else { stagnant = 0; lastCount = stats.totalSearches; }
     if (newCount >= total) { addLog('ok', '✅ 全部查詢完成！'); break; }
@@ -756,6 +843,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthEl = document.getElementById('inputMonth');
     if (yearEl)  yearEl.value  = saved.year;
     if (monthEl) monthEl.value = saved.month;
+    // 還原上次查的航線，重刷後直接停在同一頁，不用再去「已存航線」重選
+    const oEl = document.getElementById('inputOrigin');
+    const dEl = document.getElementById('inputDest');
+    if (oEl && saved.originQuery)      oEl.value = saved.originQuery;
+    if (dEl && saved.destinationQuery) dEl.value = saved.destinationQuery;
     if (saved.customStays) saved.customStays.forEach(n => customStays.add(n));
   }
 
@@ -782,6 +874,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('routeSwitcher')?.addEventListener('change', onRouteSwitch);
+
+  attachAirportAutocomplete('inputOrigin');
+  attachAirportAutocomplete('inputDest');
 
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('auto') === '1') startSearch();
@@ -926,6 +1021,8 @@ function updateSubtitleStatic() {
   const monthSel = document.getElementById('inputMonth');
   const monthLabel = monthSel?.selectedOptions?.[0]?.textContent || '';
   sub.textContent = route ? `${route.label.replace('→', ' → ')} · ${monthLabel} · 來回` : '';
+  const title = document.getElementById('mainTitle');
+  if (title && route) title.textContent = `✈️ ${route.label.replace('→', ' → ')} 機票價格追蹤`;
 }
 
 // Rebuild the month <select> for the chosen route and load its newest month.
