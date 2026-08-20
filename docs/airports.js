@@ -42,7 +42,7 @@ window.AIRPORTS = [
   { iata: 'HKT', city: '普吉', country: '泰國', alt: 'phuket 普吉島' },
   { iata: 'KUL', city: '吉隆坡', country: '馬來西亞', alt: 'kuala lumpur' },
   { iata: 'CGK', city: '雅加達', country: '印尼', alt: 'jakarta soekarno' },
-  { iata: 'DPS', city: '峇里島', country: '印尼', alt: 'bali denpasar 巴里島' },
+  { iata: 'DPS', city: '峇里島', country: '印尼', alt: 'bali denpasar 巴里島 峇厘島 巴厘島 峇里 巴里' },
   { iata: 'MNL', city: '馬尼拉', country: '菲律賓', alt: 'manila' },
   { iata: 'CEB', city: '宿霧', country: '菲律賓', alt: 'cebu' },
   { iata: 'SGN', city: '胡志明市', country: '越南', alt: 'ho chi minh saigon 西貢' },

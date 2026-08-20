@@ -1,36 +1,43 @@
 @echo off
-REM 掛著給外網用：開 server(3000) + ngrok 通道。本機純內網請用 start-server.bat。
-setlocal enabledelayedexpansion
+REM Online mode: server(3000) + ngrok tunnel for external access.
+REM For local-only use, run start-server.bat instead.
+REM NOTE: keep this file ASCII-only. cmd reads .bat in the system codepage,
+REM so non-ASCII comments/echoes get garbled and break parsing.
+setlocal
+title Flight Search - ONLINE (ngrok)
 
 set NODE=E:\dev\node\node.exe
 set NGROK=E:\dev\ngrok\ngrok.exe
 
-REM 關掉舊的 node，避免佔用 3000
-taskkill /f /im node.exe >nul 2>&1
+echo [1/3] Stopping old node / ngrok...
+taskkill /f /im node.exe  >nul 2>&1
+taskkill /f /im ngrok.exe >nul 2>&1
 
-echo [1/3] 啟動 server...
+echo [2/3] Starting server on port 3000...
 start "Flight Search Server" /min "%NODE%" "%~dp0server.js"
 timeout /t 3 /nobreak >nul
 
-REM 固定網域：把網域寫在 .ngrok-domain 第一行（例：my-flight.ngrok-free.app）。
-REM 沒有這個檔就退回隨機網址。
+REM Fixed domain: put it on the first line of .ngrok-domain
+REM (e.g. my-flight.ngrok-free.app). No file = random URL.
 set DOMAIN=
 if exist "%~dp0.ngrok-domain" set /p DOMAIN=<"%~dp0.ngrok-domain"
 
-echo [2/3] 啟動 ngrok...
+echo [3/3] Starting ngrok tunnel...
 if defined DOMAIN (
-  start "ngrok" "%NGROK%" http 3000 --url=!DOMAIN!
-  echo     外網網址: https://!DOMAIN!
+  echo      Public URL: https://%DOMAIN%
+  start "ngrok" cmd /k "%NGROK% http 3000 --url=%DOMAIN%"
 ) else (
-  start "ngrok" "%NGROK%" http 3000
-  echo     未設固定網域，改用隨機網址，請到 http://localhost:4040 查看
+  echo      No fixed domain set. Using random URL, see http://localhost:4040
+  start "ngrok" cmd /k "%NGROK% http 3000"
 )
-timeout /t 3 /nobreak >nul
+timeout /t 4 /nobreak >nul
 
-echo [3/3] 開啟控制台與本機介面...
+echo Opening ngrok console + local UI...
 start "" "http://localhost:4040"
 start "" "http://localhost:3000"
 
 echo.
-echo 完成。外網進來會要求密碼（.viewer-password）；本機 localhost 免密碼。
+echo Done. External visitors need the password (.viewer-password). localhost is free.
+echo The "ngrok" window shows Session Status: online = tunnel is UP.
+echo Close that ngrok window = tunnel goes DOWN.
 endlocal

@@ -165,14 +165,15 @@ cache/ ──build-static.js(加密)──► docs/ ──git push──► GitH
 - `CONCURRENCY` 常數在 scraper.js 控制並行爬取數
 - debug 截圖存在 `debug/` 目錄
 
-## 目前狀態（2026-08-14）
+## 目前狀態（2026-08-17）
 
 - ✅ 航線分開保存：`cache/routes/<base64url(出發→目的)>/YYYY-MM/`，首爾/釜山不再互蓋（舊資料已用 `migrate-cache.js` 遷移）。
 - ✅ UI：「已存航線」下拉切換；按鈕拆成「🔍開始查詢(增量)」「🗑️清除快取(只清當前航線+月,含確認視窗)」「📤發布到網站」；全部加了 hover 說明(tooltip)。
 - ✅ 新增 ngrok 動態外網路（`start-online.bat` + `server.js` 外網密碼閘 + `.ngrok-domain` 固定網域）。密碼閘已測試通過（本機放行 / 外網無密碼或錯密碼擋 401 / 對密碼放行 / 危險端點也擋）。桌面捷徑「機票查詢-外網.lnk」已建。固定網域 `elixir-stuck-hamburger.ngrok-free.dev` 已填入 `.ngrok-domain`，端對端通道測試通過。
 - ✅ 查詢即時更新：`pollResults` 輪詢迴圈每 5 秒也呼叫 `loadData()`，票價一筆筆進表格＋圖表，不用重刷網頁（僅動態 server 有效，靜態站不現場爬）。
 - ✅ 記住當前航線：`saveSettings()` 存 `originQuery/destinationQuery`，`DOMContentLoaded` 還原到輸入框，`populateRoutes` 下拉預選當前航線 → 重刷後停在同一頁，不用再去「已存航線」重選。
-- ✅ 出發地／目的地機場自動完成：輸入中文/英文/IATA 皆可比對（`臺`↔`台` 已正規化），下拉顯示 IATA+城市+國家，點選填入中文城市名（不動航線快取 key）。清單在 `public/airports.js`，要加機場就編這個檔。
+- ✅ 左上大標題(H1)跟著航線切換：`index.html` H1 加 `id="mainTitle"`，`updateSubtitle()`(動態)與 `updateSubtitleStatic()`(靜態)一起更新標題文字（之前只更新副標題，H1 寫死停在「台北→釜山」）。
+- ✅ 出發地／目的地機場自動完成：輸入中文/英文/IATA 皆可比對（`臺`↔`台` 已正規化），下拉顯示 IATA+城市+國家，點選填入中文城市名（不動航線快取 key）。清單在 `public/airports.js`，要加機場就編這個檔。地名別名寫進 `alt` 欄（例：DPS 已補「峇厘島/巴厘島/巴里島」等變體，因為使用者打「峇厘島(厘)」比對不到清單裡的「峇里島(里)」；選了建議會填正版城市名，維持快取 key 正確）。
 - ✅ 修好「多機場地區」目的地選不到的 bug（如峇里島）：舊 code 要求 `[role="option"]` 文字 `.includes(查詢字)` 才點，但 Google 對峇里島給的是「印尼峇里省／伍拉·賴國際機場(DPS)」皆不含「峇里島」→ 全錯誤 0 筆。改法在 `scraper.js` 目的地選取：改用 aria-label 比對、排除「任何地方/Anywhere」、優先選城市列，並先等「距離目的地」標記出現確定建議已載入。另加 Google「系統發生錯誤」頁的 reload 重試(最多3次)。已用臺北→峇里島兩個日期實測成功（10/05→10/11 NT$10955、10/12→10/18 NT$16137）。此修正同時解掉先前暫緩的「兩筆爬蟲失敗」。
   - ⚠️ 出發地選取(scraper.js 出發那段)仍是取第一個 option，臺北 OK；未來若出發地也用多機場地區(如東京/大阪多機場)可能要套同樣邏輯。
 
@@ -184,7 +185,8 @@ cache/ ──build-static.js(加密)──► docs/ ──git push──► GitH
 - 靜態站密碼放 `.viewer-password`（已 gitignore，切勿上傳）。
 
 **B. ngrok 動態外網（本機掛著時，外網能用完整查詢介面：能爬、能篩）**
-- 啟動：`start-online.bat` → 開 server(3000) + ngrok，並開 `localhost:4040`(ngrok 控制台) 與 `localhost:3000`。
+- 啟動：`start-online.bat` → 開 server(3000) + ngrok，並開 `localhost:4040`(ngrok 控制台) 與 `localhost:3000`。ngrok 用 `cmd /k` 開，視窗會留著顯示 `Session Status: online`（=外網在跑；關掉該視窗=外網斷）。開頭會先 `taskkill` 舊 node/ngrok，避免免費版「一次只能一個連線」撞名額。
+- ⚠️ **`.bat` 一律只能用 ASCII（英文）**：cmd 用系統碼頁(Big5/cp950)讀 `.bat`，檔案存成 UTF-8 時中文註解/echo 會變亂碼並讓整個 bat 解析失敗（node/ngrok 都不會起、看不到黑視窗）。2026-08-17 踩過這坑，已把 `start-online.bat` 改純英文修好。
 - **固定網域**：把網域字串寫進 `E:\dev\flight-search\.ngrok-domain` 第一行（例：`my-flight.ngrok-free.app`），`start-online.bat` 會 `ngrok http 3000 --url=<domain>`。此檔已 gitignore。免費版的固定網域要先到 https://dashboard.ngrok.com/domains 領一個（免費送 1 個）。沒設此檔就退回隨機網址。
 - **外網密碼閘**（`server.js` 中介層）：本機(Host=localhost)免密碼；從 ngrok 進來的 Host 需 HTTP Basic Auth，密碼沿用 `.viewer-password`（帳號欄可空/任填，只比對密碼）。此閘擋住所有路由，含危險端點 `/api/clear-cache`、`/api/publish`。
 - ⚠️ 動態 server 的 API 本身無防護，**只靠這道 Host-based 密碼閘保護外網**。不要另外把 3000 埠直接對外開放（那樣繞過閘門）。ngrok 通道是唯一對外入口才安全。

@@ -25,6 +25,18 @@
       ]
     },
     {
+      "slug": "6Ie65YyX4oaS5aWn5YWL6Jit",
+      "label": "臺北→奧克蘭",
+      "months": [
+        {
+          "year": 2027,
+          "month": 3,
+          "label": "2027年3月",
+          "count": 124
+        }
+      ]
+    },
+    {
       "slug": "6Ie65YyX4oaS5bOH5Y6Y5bO2",
       "label": "臺北→峇厘島",
       "months": [
@@ -115,5 +127,5 @@
       ]
     }
   ],
-  "generatedAt": "2026-08-17T03:39:12.695Z"
+  "generatedAt": "2026-08-20T07:58:25.927Z"
 }
