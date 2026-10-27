@@ -46,16 +46,38 @@ function safeEqual(a, b) {
   const bb = Buffer.from(String(b));
   return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
 }
+// 失敗次數節流：密碼是明文直接比對，PBKDF2 不擋線上暴力破解，只能靠這裡限速。
+const AUTH_WINDOW_MS = 10 * 60 * 1000;
+const AUTH_MAX_FAILS = 10;
+const authFails = new Map(); // ip -> { count, resetAt }
+function authBlocked(ip) {
+  const rec = authFails.get(ip);
+  if (!rec) return false;
+  if (Date.now() > rec.resetAt) { authFails.delete(ip); return false; }
+  return rec.count >= AUTH_MAX_FAILS;
+}
+function noteAuthFail(ip) {
+  const now = Date.now();
+  const rec = authFails.get(ip);
+  if (!rec || now > rec.resetAt) authFails.set(ip, { count: 1, resetAt: now + AUTH_WINDOW_MS });
+  else rec.count++;
+}
+
 app.use((req, res, next) => {
   if (isLocalRequest(req)) return next();          // 本機直接放行
   const pw = getViewerPassword();
   if (!pw) return next();                           // 沒設密碼 → 不擋（維持原行為）
+  const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || '';
+  if (authBlocked(ip)) {
+    return res.status(429).send('嘗試次數過多，請稍後再試 / Too many attempts');
+  }
   const [scheme, encoded] = (req.headers.authorization || '').split(' ');
   if (scheme === 'Basic' && encoded) {
     const decoded = Buffer.from(encoded, 'base64').toString('utf8');
     const supplied = decoded.slice(decoded.indexOf(':') + 1); // 使用者名稱不限，只比對密碼
-    if (safeEqual(supplied, pw)) return next();
+    if (safeEqual(supplied, pw)) { authFails.delete(ip); return next(); }
   }
+  noteAuthFail(ip);
   res.set('WWW-Authenticate', 'Basic realm="Flight Search", charset="UTF-8"');
   return res.status(401).send('需要密碼 / Password required');
 });
