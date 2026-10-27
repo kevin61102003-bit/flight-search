@@ -595,10 +595,10 @@ async function scrapeAll(dates, stays, opts = {}) {
     }
   }
 
+  // 保留 Chromium sandbox。關掉它等於讓任何被導覽到的網頁直接讀到本機檔案，
+  // 對一台公司電腦來說風險太高。--disable-dev-shm-usage 只在 Linux 的 /dev/shm
+  // 太小才需要，Windows 沒有這個問題，一併移除。
   const BROWSER_ARGS = [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
     '--disable-blink-features=AutomationControlled',
     '--window-size=1440,900',
   ];
