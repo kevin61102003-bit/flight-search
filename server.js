@@ -28,6 +28,16 @@ function getViewerPassword() {
   return null;
 }
 function isLocalRequest(req) {
+  // 經過 ngrok 等反向代理進來的請求一定帶 X-Forwarded-For/Proto，
+  // 即使 Host 被改寫成 localhost 也不能當成本機請求，否則密碼閘會被繞過。
+  if (req.headers['x-forwarded-for'] || req.headers['x-forwarded-proto'] || req.headers['x-forwarded-host']) {
+    return false;
+  }
+  // TCP 連線來源也必須是 loopback，避免同網段直接連進來時偽造 Host 過關。
+  const addr = (req.socket && req.socket.remoteAddress) || '';
+  if (!(addr === '::1' || addr === '127.0.0.1' || addr.startsWith('::ffff:127.'))) {
+    return false;
+  }
   const host = (req.headers.host || '').split(':')[0].toLowerCase();
   return host === 'localhost' || host === '127.0.0.1' || host === '::1';
 }
