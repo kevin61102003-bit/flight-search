@@ -227,7 +227,8 @@ if (process.argv.includes('--scrape-all')) {
     .then(() => { console.log('\n✨ All scraping complete!'); process.exit(0); })
     .catch(err => { console.error('❌ Scrape failed:', err); process.exit(1); });
 } else {
-  app.listen(PORT, () => {
+  // 只聽 loopback：外網一律走 ngrok，避免同網段直接連進來繞過密碼閘。
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`
 ╔══════════════════════════════════════════════════╗
 ║          ✈️  Flight Price Tracker                 ║
